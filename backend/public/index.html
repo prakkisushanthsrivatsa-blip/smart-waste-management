@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart Waste Command Center - Hyderabad</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Google Fonts & Font Awesome Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --panel-bg: rgba(30, 41, 59, 0.85);
+      --border-color: rgba(255, 255, 255, 0.1);
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-yellow: #eab308;
+      --accent-red: #ef4444;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body { display: flex; height: 100vh; background: var(--bg-dark); color: var(--text-main); overflow: hidden; }
+
+    /* Left Control Sidebar */
+    #sidebar {
+      width: 420px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border-right: 1px solid var(--border-color);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      z-index: 1000;
+      box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+    }
+
+    .header-title { display: flex; align-items: center; gap: 12px; }
+    .header-title i { font-size: 1.8rem; color: var(--accent-blue); }
+    .header-title h1 { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px; }
+
+    /* Stat Cards Row */
+    .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .stat-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      padding: 10px;
+      border-radius: 10px;
+      text-align: center;
+    }
+    .stat-card .value { font-size: 1.3rem; font-weight: 800; }
+    .stat-card .label { font-size: 0.65rem; color: var(--text-sub); text-transform: uppercase; font-weight: 600; margin-top: 2px; }
+
+    /* Action Buttons */
+    .btn {
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 0.85rem;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5); }
+
+    /* Auto-Sim Switch Panel */
+    .switch-panel {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-color);
+      padding: 12px;
+      border-radius: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .switch-panel span { font-size: 0.8rem; font-weight: 600; color: var(--text-main); }
+    
+    .toggle-switch { position: relative; width: 44px; height: 22px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #334155; transition: .3s; border-radius: 22px; }
+    .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+    input:checked + .slider { background-color: var(--accent-green); }
+    input:checked + .slider:before { transform: translateX(22px); }
+
+    /* Simulator Form Box */
+    .simulator-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-color);
+      padding: 12px;
+      border-radius: 10px;
+    }
+    .simulator-box h3 { font-size: 0.75rem; text-transform: uppercase; color: var(--accent-blue); margin-bottom: 8px; }
+    .form-group { margin-bottom: 8px; }
+    label { font-size: 0.7rem; color: var(--text-sub); font-weight: 600; display: block; margin-bottom: 2px; }
+    select, input {
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 7px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      outline: none;
+    }
+
+    /* Filter Bar */
+    .filter-bar { display: flex; gap: 6px; }
+    .filter-btn {
+      flex: 1;
+      padding: 5px;
+      font-size: 0.7rem;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: rgba(255,255,255,0.05);
+      color: var(--text-sub);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .filter-btn.active { background: var(--accent-blue); color: #000; border-color: var(--accent-blue); }
+
+    /* Bins Scrollable Feed & Itinerary */
+    .feed-container { flex-grow: 1; overflow-y: auto; padding-right: 4px; }
+    .feed-container::-webkit-scrollbar { width: 4px; }
+    .feed-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+    .bin-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-color);
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .bin-card:hover { background: rgba(255, 255, 255, 0.06); }
+    .bin-info h4 { font-size: 0.85rem; font-weight: 700; }
+    .bin-info span { font-size: 0.7rem; color: var(--text-sub); }
+
+    .status-pill { padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; }
+    .pill-red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .pill-yellow { background: rgba(234, 179, 8, 0.2); color: var(--accent-yellow); border: 1px solid var(--accent-yellow); }
+    .pill-green { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+
+    /* Driver Itinerary Cards */
+    .step-card {
+      background: rgba(37, 99, 235, 0.1);
+      border-left: 4px solid var(--accent-blue);
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .step-number { background: var(--accent-blue); color: #000; width: 22px; height: 22px; border-radius: 50%; font-weight: 800; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; }
+
+    /* Map Canvas */
+    #map { flex-grow: 1; height: 100vh; background: #0f172a; }
+
+    /* Custom Leaflet Popup */
+    .leaflet-popup-content-wrapper { background: #1e293b !important; color: #fff !important; border-radius: 10px !important; border: 1px solid rgba(255,255,255,0.1); }
+    .leaflet-popup-tip { background: #1e293b !important; }
+    .reset-btn { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 8px; }
+    .reset-btn:hover { background: #dc2626; }
+  </style>
+</head>
+<body>
+
+  <!-- Left Sidebar -->
+  <div id="sidebar">
+    <div class="header-title">
+      <i class="fa-solid fa-dumpster-fire"></i>
+      <div>
+        <h1>EcoRoute AI</h1>
+        <p style="font-size: 0.75rem; color: var(--text-sub);">Hyderabad Smart City Operations</p>
+      </div>
+    </div>
+
+    <!-- Live Analytics -->
+    <div class="metrics-grid">
+      <div class="stat-card">
+        <div class="value" id="stat-total" style="color: var(--accent-blue);">0</div>
+        <div class="label">Total Bins</div>
+      </div>
+      <div class="stat-card">
+        <div class="value" id="stat-critical" style="color: var(--accent-red);">0</div>
+        <div class="label">Critical</div>
+      </div>
+      <div class="stat-card">
+        <div class="value" id="stat-normal" style="color: var(--accent-green);">0</div>
+        <div class="label">Normal</div>
+      </div>
+    </div>
+
+    <!-- Dispatch Route Generator Button -->
+    <button class="btn" onclick="generateRoute()">
+      <i class="fa-solid fa-route"></i> Generate Collection Route
+    </button>
+
+    <!-- Auto IoT Network Simulation Switch -->
+    <div class="switch-panel">
+      <span><i class="fa-solid fa-satellite-dish" style="color: var(--accent-green); margin-right: 6px;"></i> Live Auto-Telemetry Feed</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="auto-sim-toggle" onchange="toggleAutoSimulation(this)">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- Manual Simulator Box -->
+    <div class="simulator-box">
+      <h3><i class="fa-solid fa-wifi"></i> Manual Sensor Simulator</h3>
+      <div style="display: flex; gap: 6px;">
+        <div style="flex: 1;">
+          <label>Target Bin</label>
+          <select id="sim-bin-id"></select>
+        </div>
+        <div style="width: 80px;">
+          <label>Dist (CM)</label>
+          <input type="number" id="sim-distance" value="5" min="0" max="100" />
+        </div>
+      </div>
+      <button class="btn" style="margin-top: 8px; background: linear-gradient(135deg, #059669 0%, #10b981 100%);" onclick="sendTelemetry()">
+        Send Signal
+      </button>
+    </div>
+
+    <!-- Mode Selector Tab (Bin List vs Driver Route Itinerary) -->
+    <div style="display: flex; flex-direction: column; gap: 6px; flex-grow: 1; overflow: hidden;">
+      <div class="filter-bar">
+        <button class="filter-btn active" id="tab-bins" onclick="switchView('BIN_LIST')">City Bins</button>
+        <button class="filter-btn" id="tab-route" onclick="switchView('DRIVER_ROUTE')">Driver Itinerary</button>
+      </div>
+
+      <!-- Search bar (visible in BIN_LIST view) -->
+      <input type="text" id="search-input" placeholder="🔍 Search Bin ID..." oninput="filterBins()" />
+
+      <!-- Scrollable Container -->
+      <div class="feed-container" id="feed-container">
+        <!-- Dynamic Content Inserted Here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Map Canvas -->
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // Map setup over Hyderabad
+    const map = L.map('map').setView([17.4150, 78.4480], 12);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    let allBinsData = [];
+    let currentRoute = [];
+    let currentView = 'BIN_LIST';
+    let autoSimInterval = null;
+    let markers = {};
+    let routeLine = null;
+
+    function getPillClass(status) {
+      if (status === 'Full' || status === 'Overflow') return 'pill-red';
+      if (status === 'Nearly Full') return 'pill-yellow';
+      return 'pill-green';
+    }
+
+    function getMarkerColor(fillLevel) {
+      if (fillLevel >= 80) return '#ef4444';
+      if (fillLevel >= 60) return '#eab308';
+      return '#22c55e';
+    }
+
+    // 1. Fetch & Render All Bins
+    async function loadBins() {
+      try {
+        const res = await fetch('/api/bins');
+        allBinsData = await res.json();
+
+        // Update Analytics
+        const criticalCount = allBinsData.filter(b => b.currentFillLevel >= 80).length;
+        document.getElementById('stat-total').innerText = allBinsData.length;
+        document.getElementById('stat-critical').innerText = criticalCount;
+        document.getElementById('stat-normal').innerText = allBinsData.length - criticalCount;
+
+        renderView();
+      } catch (err) {
+        console.error('Error loading bins:', err);
+      }
+    }
+
+    // 2. Render View (Bins Feed vs Driver Itinerary)
+    function renderView() {
+      const feed = document.getElementById('feed-container');
+      const selectContainer = document.getElementById('sim-bin-id');
+      const searchTerm = document.getElementById('search-input').value.toLowerCase();
+
+      selectContainer.innerHTML = '';
+      allBinsData.forEach(bin => {
+        const opt = document.createElement('option');
+        opt.value = bin.binId;
+        opt.textContent = `${bin.binId} (${bin.currentFillLevel}%)`;
+        selectContainer.appendChild(opt);
+
+        // Update Map Markers
+        const [lng, lat] = bin.location.coordinates;
+        const color = getMarkerColor(bin.currentFillLevel);
+        const isCritical = bin.currentFillLevel >= 80;
+
+        if (markers[bin.binId]) {
+          map.removeLayer(markers[bin.binId]);
+        }
+
+        const circle = L.circleMarker([lat, lng], {
+          radius: isCritical ? 11 : 8,
+          color: '#ffffff',
+          weight: 2,
+          fillColor: color,
+          fillOpacity: 0.85
+        }).addTo(map);
+
+        circle.bindPopup(`
+          <div style="font-family: sans-serif; padding: 4px;">
+            <strong style="font-size: 1rem;">${bin.binId}</strong><br/>
+            <span style="color: #94a3b8; font-size: 0.8rem;">Status: ${bin.status}</span><br/>
+            <div style="margin-top: 4px; font-weight: bold; color: ${color};">Fill Level: ${bin.currentFillLevel}%</div>
+            <button class="reset-btn" onclick="resetBin('${bin.binId}')">🧹 Mark as Collected</button>
+          </div>
+        `);
+
+        markers[bin.binId] = circle;
+      });
+
+      feed.innerHTML = '';
+
+      if (currentView === 'BIN_LIST') {
+        document.getElementById('search-input').style.display = 'block';
+        
+        allBinsData.forEach(bin => {
+          if (searchTerm && !bin.binId.toLowerCase().includes(searchTerm)) return;
+
+          const [lng, lat] = bin.location.coordinates;
+          const card = document.createElement('div');
+          card.className = 'bin-card';
+          card.onclick = () => {
+            map.flyTo([lat, lng], 15, { duration: 1.2 });
+            markers[bin.binId].openPopup();
+          };
+
+          card.innerHTML = `
+            <div class="bin-info">
+              <h4>${bin.binId}</h4>
+              <span>Fill: ${bin.currentFillLevel}%</span>
+            </div>
+            <span class="status-pill ${getPillClass(bin.status)}">${bin.status}</span>
+          `;
+          feed.appendChild(card);
+        });
+
+      } else {
+        // DRIVER_ROUTE ITINERARY VIEW
+        document.getElementById('search-input').style.display = 'none';
+
+        if (currentRoute.length === 0) {
+          feed.innerHTML = '<p style="font-size: 0.8rem; color: #94a3b8; text-align: center; margin-top: 20px;">No active route. Click "Generate Collection Route" above.</p>';
+          return;
+        }
+
+        currentRoute.forEach((bin, idx) => {
+          const distanceKm = (bin.distanceMeters / 1000).toFixed(1);
+          const card = document.createElement('div');
+          card.className = 'step-card';
+          card.onclick = () => {
+            const [lng, lat] = bin.location.coordinates;
+            map.flyTo([lat, lng], 15);
+            markers[bin.binId].openPopup();
+          };
+
+          card.innerHTML = `
+            <div class="step-number">${idx + 1}</div>
+            <div style="flex: 1;">
+              <strong style="font-size: 0.85rem;">${bin.binId}</strong>
+              <div style="font-size: 0.7rem; color: var(--text-sub);">${bin.currentFillLevel}% Full • ${distanceKm} km from depot</div>
+            </div>
+          `;
+          feed.appendChild(card);
+        });
+      }
+    }
+
+    function switchView(view) {
+      currentView = view;
+      document.getElementById('tab-bins').classList.toggle('active', view === 'BIN_LIST');
+      document.getElementById('tab-route').classList.toggle('active', view === 'DRIVER_ROUTE');
+      renderView();
+    }
+
+    function filterBins() {
+      renderView();
+    }
+
+    // 3. Mark as Collected (Reset Endpoint)
+    async function resetBin(binId) {
+      await fetch(`/api/bins/${binId}/reset`, { method: 'POST' });
+      await loadBins();
+      if (currentRoute.length > 0) generateRoute();
+    }
+
+    // 4. Send Manual Telemetry Signal
+    async function sendTelemetry() {
+      const binId = document.getElementById('sim-bin-id').value;
+      const rawDistanceCm = parseInt(document.getElementById('sim-distance').value);
+
+      await fetch('/api/bins/telemetry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ binId, rawDistanceCm })
+      });
+
+      await loadBins();
+    }
+
+    // 5. Toggle Auto-Simulating IoT Telemetry Network
+    function toggleAutoSimulation(checkbox) {
+      if (checkbox.checked) {
+        autoSimInterval = setInterval(async () => {
+          if (allBinsData.length === 0) return;
+          const randomBin = allBinsData[Math.floor(Math.random() * allBinsData.length)];
+          const randomDistance = Math.floor(Math.random() * 95); // Random reading between 0 and 95 cm
+
+          await fetch('/api/bins/telemetry', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ binId: randomBin.binId, rawDistanceCm: randomDistance })
+          });
+
+          await loadBins();
+        }, 4000);
+      } else {
+        clearInterval(autoSimInterval);
+      }
+    }
+
+    // 6. Generate Route & Switch to Driver Itinerary View
+    async function generateRoute() {
+      const truckLng = 78.4744;
+      const truckLat = 17.3984; // Abids Central Depot
+
+      const res = await fetch(`/api/bins/route/generate?lng=${truckLng}&lat=${truckLat}`);
+      const data = await res.json();
+
+      if (!data.route || data.totalPickups === 0) {
+        alert('All bins are clean! No pickup routes required.');
+        if (routeLine) map.removeLayer(routeLine);
+        currentRoute = [];
+        switchView('BIN_LIST');
+        return;
+      }
+
+      currentRoute = data.route;
+
+      const pathCoordinates = [[truckLat, truckLng]];
+      data.route.forEach(bin => {
+        const [lng, lat] = bin.location.coordinates;
+        pathCoordinates.push([lat, lng]);
+      });
+
+      if (routeLine) map.removeLayer(routeLine);
+
+      routeLine = L.polyline(pathCoordinates, {
+        color: '#ef4444',
+        weight: 5,
+        opacity: 0.9,
+        dashArray: '10, 10'
+      }).addTo(map);
+
+      map.fitBounds(routeLine.getBounds(), { padding: [60, 60] });
+      switchView('DRIVER_ROUTE');
+    }
+
+    loadBins();
+  </script>
+</body>
+</html>
